@@ -31,7 +31,8 @@ public class WordCount {
             System.exit(1);
         }
 
-        DataCount<String>[] counts = counter.getCounts();
+        @SuppressWarnings("unchecked")
+		DataCount<String>[] counts = (DataCount<String>[]) counter.getCounts();
         //sortByDescendingCount(counts);
         
         // sum up the total words
@@ -86,34 +87,161 @@ public class WordCount {
     	}
     }
 
-    private static <E extends Comparable<? super E>> void quickSort(
-            DataCount<E>[] counts) {
-        for (int i = 1; i < counts.length; i++) {
-            DataCount<E> x = counts[i];
-            int j;
-            for (j = i - 1; j >= 0; j--) {
-                if (counts[j].count >= x.count) {
-                    break;
-                }
-                counts[j + 1] = counts[j];
-            }
-            counts[j + 1] = x;
-        }
+    // protected insertionSort that works on sub-arrays. (For quickSort method)
+    protected static < E extends Comparable< ? super E > >
+    void insertionSort(DataCount<E>[] counts, int start, int stop)
+    {
+    	int k, pos;
+    	DataCount<E> tmp;
+    	
+    	// we are not testing for ranges to keep times down - private so ok
+    	for( pos = start + 1; pos <= stop; pos++ )
+    	{
+    		tmp = counts[pos];
+    		for(k = pos; k > 0 && tmp.compareTo(counts[k-1]) < 0; k-- )
+    			counts[k] = counts[k-1];
+    		counts[k] = tmp;
+    	}
     }
     
-    private static <E extends Comparable<? super E>> void mergeSort(
+    // QuickSort and helpers --------------------------
+    // median3 sorts counts[left], counts[center], and counts[right]
+    // it leaves the smallest in counts[left], the largest in counts[right]
+    // and median (the pivot) is moved "out-of-the-way" in counts[right-1].
+    // (counts[center] has what used to be in counts[right-1]
+    protected static < E extends Comparable< ? super E > >
+    DataCount<E> median3(DataCount<E>[] counts, int left, int right)
+    {
+    	int center;
+    	DataCount<E> tmp;
+    	
+    	// swaps are done in-line for speed; each compound line in a swap
+    	center = (left + right) / 2;
+    	if(counts[center].compareTo(counts[left]) < 0)
+    	{	
+    		tmp = counts[center]; counts[center] = counts[left]; counts[left] = tmp;	
+    	}
+    	if(counts[right].compareTo(counts[left]) < 0)
+    	{	
+    		tmp = counts[right]; counts[right] = counts[left]; counts[left] = tmp;	
+    	}
+    	if(counts[center].compareTo(counts[left]) < 0)
+    	{	
+    		tmp = counts[right]; counts[right] = counts[center]; counts[center] = tmp;	
+    	}
+    	
+    	tmp = counts[center]; counts[center] = counts[right-1]; counts[right-1] = tmp;
+    	
+    	return counts[right-1];
+    }
+    
+    protected static int QS_RECURSION_LIMIT = 15;
+    
+    public static boolean setRecursionLimit(int newLim)
+    {
+    	if (newLim < 2 || newLim > 1000)
+    		return false;
+    	QS_RECURSION_LIMIT = newLim;
+    	return true;
+    }
+    
+    private static <E extends Comparable<? super E>> void quickSort(
+            DataCount<E>[] counts) 
+    {
+        quickSort(counts, 0, counts.length - 1 );
+    }
+    
+    protected static <E extends Comparable<? super E>> void quickSort(
+    		DataCount<E>[] counts, int left, int right)
+    {
+    	DataCount<E> pivot, tmp;
+    	int i, j;
+    	
+    	if( left + QS_RECURSION_LIMIT <= right )
+    	{
+    		pivot = median3(counts, left, right);
+    		for( i = left, j = right - 1; ; )
+    		{
+    			while( counts[++i].compareTo(pivot) < 0 )
+    				;
+    			while( pivot.compareTo(counts[--j]) < 0 )
+    				;
+    			if ( i < j )
+    			{
+    				tmp = counts[i]; counts[i] = counts[j]; counts[j] = tmp;
+    			}
+    			else
+    				break;
+    		}
+    		
+    		// restore pivot
+    		tmp = counts[i]; counts[i] = counts[right - 1]; counts[right - 1] = tmp;
+    		
+    		// recursive calls on smaller sub-groups
+    		quickSort(counts, left, i - 1);
+    		quickSort(counts, i + 1, right);
+    	}
+    	else
+    		// non-recursive escape value - insertion sort
+    		insertionSort(counts, left, right);
+    }
+    
+    // mergesort and helpers
+    // input array 1: clent[leftPos] ... client[rightPos-1]
+    // input array 2: client[rightPos] ... client[rightStop]
+    // working[] array supplied by client to avoid local allocation
+    protected static < E extends Comparable< ? super E > >
+    void merge( DataCount<E>[] client, E[] working,
+    		int leftPos, int rightPos, int rightStop)
+    {
+    	int leftStop, workingPos, arraySize;
+    	
+    	workingPos = leftPos;
+    	leftStop = rightPos - 1;
+    	arraySize = rightStop - leftPos + 1;
+    	
+    	// as soon as we reach the end of either input array, stop
+    	while(leftPos <= leftStop && rightPos <= rightStop)
+    		if(client[leftPos].compareTo(client[rightPos]) < 0 )
+    			working[workingPos++] = client[leftPos++].data;
+    		else
+    			working[workingPos++] = client[rightPos++].data;
+    	
+    	// merge is over; copy the remainder of one or the other input array
+    	while(leftPos <= leftStop)
+    		working[workingPos++] = client[leftPos++].data;
+    	while(rightPos <= rightStop)
+    		working[workingPos++] = client[rightPos++].data;
+    	
+    	// copy back into client array
+    	for( ; arraySize > 0; arraySize--, rightStop-- )
+    		client[rightStop].data = working[rightStop];
+    }
+    
+    // mergesort internal function
+    protected static < E extends Comparable< ? super E > >
+    void mergeSort(DataCount<E>[] counts, E[] working, int start, int stop)
+    {
+    	int rightStart;
+    	
+    	if ( stop - start < 1 )
+    		return;
+    	
+    	rightStart = (start + stop)/2 + 1;
+    	mergeSort(counts, working, start, rightStart - 1);
+    	mergeSort(counts, working, rightStart, stop);
+    	merge(counts, working, start, rightStart, stop);
+    }
+    
+    // mergesort driver
+	private static <E extends Comparable<? super E>> void mergeSort(
             DataCount<E>[] counts) {
-        for (int i = 1; i < counts.length; i++) {
-            DataCount<E> x = counts[i];
-            int j;
-            for (j = i - 1; j >= 0; j--) {
-                if (counts[j].count >= x.count) {
-                    break;
-                }
-                counts[j + 1] = counts[j];
-            }
-            counts[j + 1] = x;
-        }
+    	if ( counts.length < 2 )
+    		return;
+    	
+		@SuppressWarnings("unchecked")
+		E[] working = (E[])new Comparable[counts.length];
+    	mergeSort(counts, working, 0, counts.length - 1);
     }
     
     public static void main(String[] args) {
@@ -159,6 +287,6 @@ public class WordCount {
             System.exit(1);
         }
         
-        printSortedWords(wordCounts);
+        //printSortedWords(wordCounts);
     }
 }

@@ -36,9 +36,9 @@ class DataCount<E extends Comparable<? super E>> implements Comparable<DataCount
     }
 
     @Override
-	public int compareTo(DataCount<E> arg0) {
+	public int compareTo(DataCount<E> other) {
 		// TODO Auto-generated method stub
-		return this.data.compareTo(arg0.data);
+		return this.data.compareTo(other.data);
 	}
 }
 
@@ -78,6 +78,6 @@ public interface DataCounter<E> {
      * 
      * @return an array of the data counts.
      */
-    public DataCount<E>[] getCounts();
+    public DataCount<? super E>[] getCounts();
 
 }
