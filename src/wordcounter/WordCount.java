@@ -287,6 +287,7 @@ public class WordCount {
             System.exit(1);
         }
         
-        //printSortedWords(wordCounts);
+        printSortedWords(wordCounts);
+        System.out.println(totalCount);
     }
 }
